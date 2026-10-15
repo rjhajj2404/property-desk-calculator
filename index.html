@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Property Desk Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: inputs on the left (rates, then one row per process), live result panel on the right, stacked on a phone. */
+:root{
+  --bg:#EEF1F7; --card:#FFFFFF; --ink:#1B2236; --ink2:#566079; --line:#DCE1EC;
+  --accent:#3659E3; --accent-soft:#E6EBFD; --good:#1F8A5B; --good-soft:#DDF3E8; --warn:#B4531A; --warn-soft:#FBE8D8;
+  --panel:#1B2236; --panel-ink:#FFFFFF; --panel-ink2:#AEB6CC; --panel-line:#343D58; --panel-gold:#F2B84B;
+  --font:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12172A; --card:#1C2338; --ink:#EDF0F8; --ink2:#9AA4BE; --line:#2E3752;
+  --accent:#7D95FF; --accent-soft:#273157; --good:#5FD39A; --good-soft:#1C3B2F; --warn:#F0A267; --warn-soft:#42291A;
+  --panel:#0B0F1D; --panel-ink:#FFFFFF; --panel-ink2:#9AA4BE; --panel-line:#2A3350; --panel-gold:#F2B84B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12172A; --card:#1C2338; --ink:#EDF0F8; --ink2:#9AA4BE; --line:#2E3752;
+  --accent:#7D95FF; --accent-soft:#273157; --good:#5FD39A; --good-soft:#1C3B2F; --warn:#F0A267; --warn-soft:#42291A;
+  --panel:#0B0F1D; --panel-ink:#FFFFFF; --panel-ink2:#9AA4BE; --panel-line:#2A3350; --panel-gold:#F2B84B; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;margin:0;
+  padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 24px;flex-wrap:wrap;margin-bottom:20px}
+h1{font-size:clamp(1.5rem,3vw,2rem);line-height:1.15;margin:0;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+.sub{color:var(--ink2);margin:6px 0 0;max-width:60ch}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{color:#fff;filter:brightness(1.08)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:20px;align-items:start}
+.grid>*{min-width:0}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.results{order:-1;position:static!important}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card+.card{margin-top:16px}
+h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);margin:0 0 12px;font-weight:700}
+
+.rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media(max-width:560px){.rates{grid-template-columns:1fr}}
+.stack .line.off{display:none}
+.field label{display:block;font-size:12.5px;color:var(--ink2);font-weight:600;margin-bottom:5px}
+.inp{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden}
+.inp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp span{padding:0 0 0 11px;color:var(--ink2);font-family:var(--mono);font-size:14px}
+.inp span.end{padding:0 11px 0 0}
+input[type=number],input[type=text]{font:inherit;color:var(--ink);background:transparent;border:0;outline:0;width:100%;min-width:0;padding:10px 11px;font-variant-numeric:tabular-nums}
+input[type=number]{font-family:var(--mono);font-weight:600;font-size:16px}
+.inp input[type=number]{padding-left:6px}
+input[type=number]::-webkit-inner-spin-button{opacity:.4}
+.rates.r2{margin-top:12px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:9px 16px;font-weight:700;font-size:14px}
+.seg button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.pk{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.pk small{color:var(--ink2);font-weight:600}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+.thead,.row{display:grid;grid-template-columns:minmax(0,1.6fr) 86px 86px 92px 78px 30px;gap:10px;align-items:center}
+.thead{font-size:11.5px;color:var(--ink2);font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px;border-bottom:1px solid var(--line)}
+.row{padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-of-type{border-bottom:0}
+.row .name{font-weight:600;padding:8px 0;border-radius:8px}
+.row textarea{font:inherit;font-weight:600;font-size:14.5px;line-height:1.3;color:var(--ink);background:transparent;border:0;border-bottom:1.5px solid transparent;outline:0;width:100%;min-width:0;padding:6px 0;resize:none}
+.row textarea:focus{border-bottom-color:var(--accent)}
+.row .inp input{padding:8px 4px 8px 6px;font-size:15px}
+.rsave{font-family:var(--mono);font-weight:600;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.rsave small{display:block;color:var(--ink2);font-weight:500;font-size:11px;font-family:var(--font)}
+.x{border:0;background:transparent;color:var(--ink2);font-size:20px;line-height:1;border-radius:8px;width:34px;height:34px}
+.x:hover{background:var(--warn-soft);color:var(--warn)}
+.lab{display:none}
+@media(max-width:700px){
+  .thead{display:none}
+  .row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;padding:14px 0}
+  .row .name{grid-column:1/-1;display:flex;gap:8px;align-items:center}
+  .row .name input{flex:1}
+  .lab{display:block;font-size:11.5px;color:var(--ink2);font-weight:600;margin-bottom:3px}
+  .row .rsave{grid-column:1/-1;text-align:left}
+  .row .rsave small{display:inline;margin-left:6px}
+  .row .xcell{position:absolute}
+  .row{position:relative}
+  .xcell{top:6px;right:0}
+  .row .name{padding-right:34px}
+}
+.addrow{margin-top:10px}
+.totals{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;margin-top:6px;border-top:2px solid var(--line);font-weight:700}
+.totals span.v{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hint{color:var(--ink2);font-size:13px;margin:12px 0 0}
+
+.results{position:sticky;top:16px;background:var(--panel);color:var(--panel-ink);border-radius:18px;padding:22px}
+.results h2{color:var(--panel-ink2)}
+.hero{font-size:clamp(1.6rem,3.4vw,2.1rem);line-height:1.12;font-weight:800;letter-spacing:-.02em;color:var(--panel-gold);text-wrap:balance}
+.twin{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.twin>div{background:rgba(255,255,255,.06);border-radius:12px;padding:12px 14px}
+.tv{font-family:var(--mono);font-weight:600;font-size:1.5rem;color:var(--panel-gold);font-variant-numeric:tabular-nums}
+.tv.dim{color:var(--panel-ink)}
+.tk{color:var(--panel-ink2);font-size:12.5px;margin-top:2px}
+.grow{margin-top:14px;border:1px solid var(--panel-line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--panel-ink2);line-height:1.5}
+.grow b{color:var(--panel-ink)}
+.grow:empty{display:none}
+.big{font-family:var(--mono);font-weight:600;font-size:clamp(2.2rem,5vw,3rem);line-height:1;letter-spacing:-.02em;color:var(--panel-gold);font-variant-numeric:tabular-nums}
+.biglab{color:var(--panel-ink2);font-size:14px;margin-top:6px}
+.stack{display:grid;gap:0;margin-top:18px}
+.line{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--panel-line)}
+.line .k{color:var(--panel-ink2);font-size:14px}
+.line .v{font-family:var(--mono);font-weight:600;font-size:17px;font-variant-numeric:tabular-nums;text-align:right}
+.line.net .v{color:var(--panel-gold)}
+.line.neg .v{color:#FFB89A}
+.verdict{margin-top:14px;border-radius:12px;padding:12px 14px;font-weight:600;font-size:14.5px;background:rgba(95,211,154,.14);color:#8FE6BD}
+.verdict.bad{background:rgba(240,162,103,.16);color:#FFC59E}
+.bars{margin-top:16px;display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:70px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px;color:var(--panel-ink2)}
+.bar .tr{height:12px;background:var(--panel-line);border-radius:6px;overflow:hidden}
+.bar .tr i{display:block;height:100%;border-radius:6px;background:var(--panel-ink2);transition:width .25s}
+.bar .tr i.after{background:var(--panel-gold)}
+.bar b{white-space:nowrap;font-family:var(--mono);color:var(--panel-ink);text-align:right;font-variant-numeric:tabular-nums}
+.work{margin-top:16px;font-size:12.5px;color:var(--panel-ink2);line-height:1.55}
+.work b{color:var(--panel-ink);font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+textarea.fallback{position:fixed;left:-9999px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Property Desk calculator</h1>
+      <p class="sub">Ask how often each job happens and how long it takes. Type it in and the results update as you go. The numbers below are examples for an 80-apartment agency, so replace them with theirs.</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="load-ex" type="button">Load example</button>
+      <button class="btn" id="clear" type="button">Clear all</button>
+      <button class="btn primary" id="copy" type="button">Copy summary</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="left">
+      <section class="card" aria-label="Costs">
+        <h2>Their cost and our price</h2>
+        <div class="rates">
+          <div class="field"><label for="rate">Staff cost per hour</label><div class="inp"><span>€</span><input id="rate" type="number" min="0" step="0.5" inputmode="decimal"></div></div>
+          <div class="field"><label for="setup">Our one-off set-up fee</label><div class="inp"><span>€</span><input id="setup" type="number" min="0" step="10" inputmode="decimal"></div></div>
+          <div class="field"><label for="monthly">Our monthly fee</label><div class="inp"><span>€</span><input id="monthly" type="number" min="0" step="10" inputmode="decimal"></div></div>
+        </div>
+        <div class="rates r2">
+          <div class="field"><label for="units">Apartments they manage</label><div class="inp"><input id="units" type="number" min="0" step="1" inputmode="numeric"></div></div>
+          <div class="field"><label for="fee">Their fee per apartment, per month</label><div class="inp"><span>€</span><input id="fee" type="number" min="0" step="5" inputmode="decimal"></div></div>
+          <div class="field"><label for="recover">Late fees and rent they would recover each month</label><div class="inp"><span>€</span><input id="recover" type="number" min="0" step="50" inputmode="decimal"></div></div>
+        </div>
+        <div class="pk"><small>Packages:</small>
+          <button class="chip" type="button" data-pk="1500,500">Starter (to 100 apts) €1,500 + €500/mo</button>
+          <button class="chip" type="button" data-pk="2500,800">Growth (to 250) €2,500 + €800/mo</button>
+          <button class="chip" type="button" data-pk="4000,1200">Pro (250+) €4,000 + €1,200/mo</button>
+        </div>
+      </section>
+
+      <section class="card" aria-label="How much counts">
+        <h2>How much of the saved time counts as money</h2>
+        <div class="seg" id="count" role="group" aria-label="Share of saved time that counts">
+          <button type="button" data-count="100">All of it</button><button type="button" data-count="75">75%</button><button type="button" data-count="50">Half</button><button type="button" data-count="25">25%</button>
+        </div>
+        <p class="hint" style="margin-top:10px">If they say "I won't cut anyone's hours", lower this and see what still holds. Saved time only turns into money if they use it: fewer paid hours, no new hire, or more apartments.</p>
+      </section>
+
+      <section class="card" aria-label="Jobs">
+        <h2>Jobs they do by hand each month</h2>
+        <div class="thead" aria-hidden="true"><div>Job</div><div>Times a month</div><div>Minutes each</div><div>% we automate</div><div style="text-align:right">Hours saved</div><div></div></div>
+        <div id="rows"></div>
+        <button class="btn addrow" id="add" type="button">+ Add a job</button>
+        <div class="totals"><span>Total by hand</span><span class="v" id="t-hand"></span><span>Total saved</span><span class="v" id="t-saved"></span></div>
+        <p class="hint">Not sure what to put in "% we automate"? Use 90% for matching payments, statements and building-cost splits, 60–70% for reminders and cleaning, 40–50% for repairs and leases, since someone still has to decide and approve.</p>
+      </section>
+    </div>
+
+    <aside class="results" aria-live="polite" aria-label="Results">
+      <h2>What they get</h2>
+      <div class="hero" id="r-hero">0</div>
+      <div class="biglab" id="r-herosub"></div>
+      <div class="twin">
+        <div><div class="tv" id="r-cph">–</div><div class="tk">per hour with us</div></div>
+        <div><div class="tv dim" id="r-cur">–</div><div class="tk">per hour today</div></div>
+      </div>
+      <div class="stack">
+        <div class="line"><span class="k" id="r-worthk">Saved time that counts</span><span class="v" id="r-worth">€0</span></div>
+        <div class="line" id="r-recl"><span class="k">Late fees and rent recovered</span><span class="v" id="r-rec">€0</span></div>
+        <div class="line"><span class="k">Our monthly fee</span><span class="v" id="r-fee">−€0</span></div>
+        <div class="line net"><span class="k">Left each month</span><span class="v" id="r-net">€0</span></div>
+        <div class="line"><span class="k">Our set-up fee, once</span><span class="v" id="r-setup">€0</span></div>
+        <div class="line net"><span class="k">Set-up paid back in</span><span class="v" id="r-pay">–</span></div>
+        <div class="line"><span class="k">Kept over 12 months, after all fees</span><span class="v" id="r-year">€0</span></div>
+      </div>
+      <div class="verdict" id="r-verdict"></div>
+      <div class="grow" id="r-grow"></div>
+      <div class="bars">
+        <div class="bar"><span>By hand</span><div class="tr"><i id="b-before" style="width:100%"></i></div><b id="b-before-v">0 h</b></div>
+        <div class="bar"><span>With us</span><div class="tr"><i class="after" id="b-after" style="width:0"></i></div><b id="b-after-v">0 h</b></div>
+      </div>
+      <div class="work" id="r-work"></div>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  var KEY='pd-calc-v3';
+  var EX={rate:15,setup:1500,monthly:500,units:80,fee:60,recover:0,count:100,rows:[
+    {name:'Chasing late rent and sending reminders',times:80,mins:24,pct:45},
+    {name:'Matching bank payments to tenants',times:80,mins:12,pct:75},
+    {name:'Splitting building costs between owners',times:12,mins:120,pct:65},
+    {name:'Booking cleaners and updating schedules',times:50,mins:24,pct:40},
+    {name:'Logging and assigning repairs',times:40,mins:36,pct:30},
+    {name:'Preparing owner statements',times:30,mins:48,pct:70},
+    {name:'Lease renewals and tenant letters',times:16,mins:75,pct:30}
+  ]};
+  var S=load()||clone(EX);
+  ['units','fee','recover','count'].forEach(function(k){if(S[k]===undefined)S[k]=EX[k]});
+  var uid=0; S.rows.forEach(function(r){r.id=++uid});
+
+  function clone(o){return JSON.parse(JSON.stringify(o))}
+  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):null}catch(e){return null}}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+  var $=function(id){return document.getElementById(id)};
+  var fmt=new Intl.NumberFormat('en-IE',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  var eur=function(n){return (n<0?'−':'')+fmt.format(Math.abs(Math.round(n)))};
+  var fmt2=new Intl.NumberFormat('en-IE',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+  var eur2=function(n){return fmt2.format(n)};
+  var h1=function(n){return (Math.round(n*10)/10).toLocaleString('en-IE',{maximumFractionDigits:1})};
+  var num=function(v){var n=parseFloat(v);return isFinite(n)&&n>0?n:0};
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+  function renderRows(){
+    $('rows').innerHTML=S.rows.map(function(r){
+      return '<div class="row" data-id="'+r.id+'">'+
+        '<div class="name"><textarea rows="2" id="n'+r.id+'" data-f="name" aria-label="Job name" placeholder="Name this job">'+esc(r.name)+'</textarea></div>'+
+        '<div><span class="lab">Times a month</span><div class="inp"><input type="number" id="t'+r.id+'" data-f="times" min="0" step="1" inputmode="decimal" value="'+r.times+'" aria-label="Times a month"></div></div>'+
+        '<div><span class="lab">Minutes each</span><div class="inp"><input type="number" id="m'+r.id+'" data-f="mins" min="0" step="5" inputmode="decimal" value="'+r.mins+'" aria-label="Minutes each"></div></div>'+
+        '<div><span class="lab">% we automate</span><div class="inp"><input type="number" id="p'+r.id+'" data-f="pct" min="0" max="100" step="5" inputmode="decimal" value="'+r.pct+'" aria-label="Percent automated"><span class="end">%</span></div></div>'+
+        '<div class="rsave"><span data-s="'+r.id+'"></span><small>by hand <span data-h="'+r.id+'"></span></small></div>'+
+        '<div class="xcell"><button class="x" type="button" data-del="'+r.id+'" aria-label="Remove job">×</button></div>'+
+      '</div>';
+    }).join('');
+  }
+
+  var FTE=160;
+  function words(f){return f<0.15?'a few hours':f<0.35?'about a quarter of an employee':f<0.65?'about half an employee':f<0.9?'about three quarters of an employee':f<1.15?'about one full-time employee':'more than one full-time employee'}
+  function calc(){
+    var rate=num(S.rate),setup=num(S.setup),monthly=num(S.monthly),units=num(S.units),fee=num(S.fee),rec=num(S.recover),cnt=Math.min(100,num(S.count))/100;
+    var hand=0,saved=0;
+    S.rows.forEach(function(r){
+      var h=num(r.times)*num(r.mins)/60, p=Math.min(100,num(r.pct))/100, s=h*p;
+      hand+=h;saved+=s;
+      var a=document.querySelector('[data-s="'+r.id+'"]'),b=document.querySelector('[data-h="'+r.id+'"]');
+      if(a)a.textContent=h1(s)+' h'; if(b)b.textContent=h1(h)+' h';
+    });
+    var worthAll=saved*rate, worth=worthAll*cnt, net=worth+rec-monthly, pay=net>0?setup/net:null, year=net*12-setup;
+    var fte=saved/FTE, cph=saved>0?monthly/saved:null;
+    $('t-hand').textContent=h1(hand)+' h'; $('t-saved').textContent=h1(saved)+' h';
+    $('r-hero').textContent=saved>0?words(fte).charAt(0).toUpperCase()+words(fte).slice(1)+' of work, handled for you':'Add their jobs to start';
+    $('r-herosub').textContent=saved>0?h1(saved)+' hours a month, out of about '+FTE+' hours in a full-time month.':'';
+    $('r-cph').textContent=cph?eur2(cph):'–'; $('r-cur').textContent=rate>0?eur2(rate):'–';
+    $('r-worthk').textContent=cnt<1?'Saved time that counts ('+Math.round(cnt*100)+'% of '+h1(saved)+' h × '+eur2(rate)+')':'Saved time ('+h1(saved)+' h × '+eur2(rate)+')';
+    $('r-worth').textContent=eur(worth);
+    $('r-recl').classList.toggle('off',rec<=0); $('r-rec').textContent='+'+eur(rec);
+    $('r-fee').textContent=eur(-monthly);
+    var nl=$('r-net'); nl.textContent=eur(net); nl.parentNode.classList.toggle('neg',net<0);
+    $('r-setup').textContent=eur(setup);
+    $('r-pay').textContent=pay?(pay<1?'under 1 month':h1(pay)+' months'):'not paid back';
+    $('r-year').textContent=eur(year);
+    var v=$('r-verdict'), be=worthAll>0?Math.max(0,(monthly-rec)/worthAll):null;
+    if(saved<=0){v.className='verdict bad';v.textContent='Add the jobs they do by hand to see the savings.'}
+    else if(net<=0){v.className='verdict bad';v.textContent='At these numbers the time and money saved do not cover our monthly fee. Check the hours with them, or check the package against the size of the agency.'}
+    else if(be!==null&&be<=0){v.className='verdict';v.textContent='The money they recover alone covers our monthly fee. Everything else is a bonus.'}
+    else{v.className='verdict';v.textContent='We cover our fee even if only '+Math.max(1,Math.ceil(be*100))+'% of the saved time turns into value.'}
+    if(saved>0&&units>0&&hand>0){
+      var extra=Math.floor(saved/(hand/units)), inc=extra*fee;
+      $('r-grow').innerHTML='<b>Room to grow.</b> The freed time covers about <b>'+extra+' more apartments</b> with no new staff, at the time each one takes today.'+(fee>0?' At '+eur(fee)+' an apartment, that is up to <b>'+eur(inc)+' a month</b> of new income, if they can win them.':'');
+    } else $('r-grow').innerHTML='';
+    var mx=Math.max(hand,1);
+    $('b-before').style.width=(hand>0?100:0)+'%'; $('b-after').style.width=((hand-saved)/mx*100)+'%';
+    $('b-before-v').textContent=h1(hand)+' h'; $('b-after-v').textContent=h1(hand-saved)+' h';
+    $('r-work').innerHTML='<b>Workings.</b> '+S.rows.filter(function(r){return num(r.times)*num(r.mins)>0}).length+' jobs take '+h1(hand)+' h by hand. We automate '+h1(saved)+' h. '+h1(saved)+' h × '+eur2(rate)+(cnt<1?' × '+Math.round(cnt*100)+'%':'')+' = '+eur(worth)+(rec>0?', plus '+eur(rec)+' recovered':'')+'. Less our '+eur(monthly)+' fee = '+eur(net)+' a month. Set-up '+eur(setup)+' ÷ '+eur(net)+' = '+(pay?h1(pay)+' months':'no payback')+'. 12 months: '+eur(net)+' × 12 − '+eur(setup)+' = '+eur(year)+'. Cost per hour with us: '+eur(monthly)+' ÷ '+h1(saved)+' h = '+(cph?eur2(cph):'–')+'.';
+    window.__sum={hand:hand,saved:saved,worth:worth,rec:rec,net:net,pay:pay,year:year,rate:rate,setup:setup,monthly:monthly,cnt:cnt,fte:fte};
+  }
+
+  function sync(){
+    ['rate','setup','monthly','units','fee','recover'].forEach(function(k){$(k).value=S[k]});
+    [].forEach.call(document.querySelectorAll('#count button'),function(b){b.setAttribute('aria-pressed',String(+b.dataset.count===+S.count))});
+    renderRows();calc();
+  }
+
+  document.addEventListener('input',function(e){
+    var t=e.target;
+    if(['rate','setup','monthly','units','fee','recover'].indexOf(t.id)>-1){S[t.id]=t.value;}
+    else if(t.dataset&&t.dataset.f){
+      var id=+t.closest('.row').dataset.id, r=S.rows.filter(function(x){return x.id===id})[0];
+      if(r) r[t.dataset.f]=t.dataset.f==='name'?t.value:t.value;
+    } else return;
+    save();calc();
+  });
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('button'); if(!t)return;
+    if(t.dataset.del){S.rows=S.rows.filter(function(r){return r.id!==+t.dataset.del});save();renderRows();calc();}
+    else if(t.dataset.count){S.count=+t.dataset.count;save();sync();}
+    else if(t.dataset.pk){var p=t.dataset.pk.split(',');S.setup=+p[0];S.monthly=+p[1];save();sync();}
+    else if(t.id==='add'){S.rows.push({id:++uid,name:'',times:0,mins:0,pct:60});save();renderRows();calc();var el=$('n'+uid);if(el)el.focus();}
+    else if(t.id==='clear'){S.rows.forEach(function(r){r.times=0;r.mins=0});save();renderRows();calc();}
+    else if(t.id==='load-ex'){S=clone(EX);S.rows.forEach(function(r){r.id=++uid});save();sync();}
+    else if(t.id==='copy'){copySummary();}
+  });
+
+  function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(function(){t.classList.remove('on')},1800)}
+  function copySummary(){
+    var s=window.__sum,lines=['Property Desk savings'];
+    S.rows.forEach(function(r){var h=num(r.times)*num(r.mins)/60;if(h>0)lines.push('- '+(r.name||'Job')+': '+r.times+' × '+r.mins+' min = '+h1(h)+' h, '+r.pct+'% automated = '+h1(h*Math.min(100,num(r.pct))/100)+' h saved')});
+    lines.push('Hours by hand: '+h1(s.hand)+' a month','Hours saved: '+h1(s.saved)+' a month, about '+(Math.round(s.fte*100)/100)+' of a full-time employee','Saved time that counts ('+Math.round(s.cnt*100)+'%): '+eur(s.worth)+' a month at '+eur2(s.rate)+'/h');
+    if(s.rec>0)lines.push('Late fees and rent recovered: '+eur(s.rec)+' a month');
+    lines.push('Our fee: '+eur(s.monthly)+' a month + '+eur(s.setup)+' set-up','Left each month: '+eur(s.net),'Set-up paid back in: '+(s.pay?h1(s.pay)+' months':'not paid back'),'Kept over 12 months after all fees: '+eur(s.year));
+    var txt=lines.join('\n');
+    function fb(){var ta=document.createElement('textarea');ta.className='fallback';ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Summary copied')}catch(e){toast('Select and copy manually')}document.body.removeChild(ta)}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){toast('Summary copied')},fb)}else fb();
+  }
+  sync();
+})();
+</script>
+</body></html>
